@@ -60,6 +60,7 @@
     regexp: '\s{{ iot_hostname }}\s*$'
     line: "{{ iot_self_ip }} {{ iot_hostname }}"
     state: present
+    unsafe_writes: true          # /etc/hosts est un bind-mount en conteneur (rename atomique impossible)
 
 # ------------------------------------------------------------------ résolveur = DNS local (10.0.2.7)
 # Méthode « resolvconf » de l'énoncé SEED (image SEED classique)…
@@ -125,6 +126,7 @@
     regexp: '^nameserver\s+{{ local_dns_ip }}\s*$'
     line: "nameserver {{ local_dns_ip }}"
     insertbefore: BOF
+    unsafe_writes: true          # /etc/resolv.conf est un bind-mount en conteneur
 
 # ------------------------------------------------------------------ Firefox : cache DNS court (best-effort)
 - name: Look for a classic Firefox install
