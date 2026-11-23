@@ -1,0 +1,21 @@
+# Inventaire de test : imite celui que CyberRangeCZ génère. Les trois VM sont des
+# conteneurs systemd pilotés par la connexion docker d'Ansible.
+all:
+  vars:
+    global_sandbox_id: 4242
+    global_pool_id: 1
+    global_sandbox_allocation_unit_id: 42
+    global_sandbox_name: ci-sandbox
+  children:
+    hosts:
+      hosts:
+        user:
+          ansible_connection: community.docker.docker
+          ansible_host: user
+        dns:
+          ansible_connection: community.docker.docker
+          ansible_host: dns
+        attacker:
+          ansible_connection: community.docker.docker
+          ansible_host: attacker
+    routers: {}
