@@ -54,3 +54,13 @@ jobs:
         run: bash ci/provision.sh provision.log
       - name: Vérifications d'intégration
         run: bash ci/check.sh
+      - name: Diagnostic en cas d'échec
+        if: failure()
+        run: |
+          for c in user attacker; do
+            unit=$([ "$c" = user ] && echo iot || echo attacker-web)
+            echo "::group::$c / $unit"
+            docker exec "$c" systemctl status "$unit" --no-pager -l 2>&1 | head -30 || true
+            docker exec "$c" journalctl -u "$unit" --no-pager -n 40 2>&1 | tail -40 || true
+            echo "::endgroup::"
+          done
