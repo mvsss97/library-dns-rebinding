@@ -1,5 +1,5 @@
 ---
-# Outils communs à toutes les VM du TP. apt n'est utilisé que pour ce qui manque,
+# Outils communs aux VM du TP. apt n'est utilisé que pour ce qui manque,
 # pour ne pas dépendre d'un accès Internet rapide pendant le provisioning.
 
 - name: Update APT cache
@@ -8,10 +8,39 @@
     cache_valid_time: 3600
     lock_timeout: 600
 
-- name: Install common tools (python3, dig)
+- name: Install common tools (python3, Flask, dig)
   ansible.builtin.apt:
     name:
       - python3
+      - python3-pip
+      - python3-flask
       - dnsutils
     state: present
     lock_timeout: 600
+
+# Sur une image où un Jinja2 récent a été installé par pip, il masque celui de la
+# distribution et casse le Flask d'apt :
+#   ImportError: cannot import name 'escape' from 'jinja2'
+# On vérifie donc que Flask s'importe vraiment, et on le répare si besoin en
+# installant par pip un ensemble cohérent (Flask + ses dépendances).
+- name: Check that Flask really imports
+  ansible.builtin.command: /usr/bin/python3 -c "import flask"
+  register: common_flask_import
+  changed_when: false
+  failed_when: false
+
+- name: Repair Flask with a consistent dependency set
+  when: common_flask_import.rc != 0
+  ansible.builtin.pip:
+    name: flask
+    state: latest
+    executable: pip3
+
+- name: Confirm Flask is usable
+  ansible.builtin.command: /usr/bin/python3 -c "import flask; print(flask.__version__)"
+  register: common_flask_version
+  changed_when: false
+
+- name: Show the Flask version in use
+  ansible.builtin.debug:
+    msg: "Flask {{ common_flask_version.stdout | trim }}"

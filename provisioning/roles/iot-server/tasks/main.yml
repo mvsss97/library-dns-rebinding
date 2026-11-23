@@ -1,11 +1,7 @@
 ---
 # Serveur IoT (thermostat) + résolution DNS sur la VM victime.
 
-- name: Install Flask
-  ansible.builtin.apt:
-    name: python3-flask
-    state: present
-    lock_timeout: 600
+# Flask est installé (et réparé si besoin) par le rôle « common ».
 
 # ------------------------------------------------------------------ fichiers du serveur IoT
 - name: Create the IoT app directory
