@@ -1,11 +1,10 @@
 ---
 # VM attaquant : serveur web (Flask) + BIND9 faisant autorité pour attacker32.com.
 
-- name: Install BIND9 and Flask
+# Flask est installé (et réparé si besoin) par le rôle « common ».
+- name: Install BIND9
   ansible.builtin.apt:
-    name:
-      - bind9
-      - python3-flask
+    name: bind9
     state: present
     lock_timeout: 600
 
