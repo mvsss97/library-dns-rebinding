@@ -1,0 +1,11 @@
+---
+- name: Restart attacker web
+  ansible.builtin.systemd:
+    name: attacker-web.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart bind
+  ansible.builtin.systemd:
+    name: "{{ bind_service }}"
+    state: restarted

@@ -1,0 +1,20 @@
+---
+# Rôle iot-server : serveur IoT (thermostat) sur la VM victime + configuration DNS/résolution.
+
+iot_user: seed                     # compte étudiant (propriétaire des fichiers, exécute le service)
+iot_dir: "/home/{{ iot_user }}/user_vm"
+iot_port: 8080                     # codé en dur dans l'énoncé SEED : ne pas changer
+iot_hostname: www.seedIoT32.com    # nom du serveur IoT (dans /etc/hosts)
+iot_self_ip: 10.0.2.6              # IP de la VM user
+local_dns_ip: 10.0.2.7            # résolveur DNS que la VM user doit utiliser
+
+# Détection de l'attaque réussie (voir iot.py) : le flag se débloque quand le serveur
+# IoT reçoit un réglage de température >= iot_attack_min portant le domaine de l'attaquant.
+iot_attacker_domain: attacker32.com
+iot_attack_min: 88
+
+iot_dns_flag: LocalDnsRebindFlag   # remplacé par flag_dns (APG) sur la plateforme
+
+# Réduire le cache DNS de Firefox (énoncé SEED, tâche 1 étape 1) pour que le rebinding
+# ne demande pas d'attendre 60 s. Best-effort : si Firefox n'est pas présent, on ignore.
+firefox_dns_cache_seconds: 10

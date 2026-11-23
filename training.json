@@ -1,0 +1,177 @@
+{
+ "title": "SEED Lab - DNS Rebinding Attack",
+ "description": "Reproduction du SEED Lab « DNS Rebinding Attack » sur CyberRangeCZ : contourner la politique de même origine du navigateur par DNS rebinding pour piloter un thermostat IoT derrière un pare-feu. Trois VM (victime, DNS local, attaquant) pré-configurées ; flag unique par étudiant.",
+ "prerequisites": [
+  "Bases de la ligne de commande Linux",
+  "Notions de DNS (enregistrements A, TTL, résolution)",
+  "Notions de HTTP et de navigateur web"
+ ],
+ "outcomes": [
+  "Expliquer la politique de même origine (Same-Origin Policy) et ce qu'elle protège",
+  "Décrire et exécuter une attaque par DNS rebinding",
+  "Comprendre pourquoi les objets connectés derrière un pare-feu restent attaquables",
+  "Citer des défenses : validation de l'en-tête Host, DNS pinning, authentification"
+ ],
+ "state": "UNRELEASED",
+ "show_stepper_bar": true,
+ "estimated_duration": 60,
+ "variant_sandboxes": true,
+ "levels": [
+  {
+   "title": "Introduction",
+   "level_type": "INFO_LEVEL",
+   "order": 0,
+   "estimated_duration": 5,
+   "minimal_possible_solve_time": null,
+   "content": "# SEED Lab — DNS Rebinding Attack\n\nVous allez attaquer un **objet connecté (IoT)** : un thermostat, piloté par une page web, **derrière un pare-feu**. Depuis l'extérieur on ne peut pas lui parler. Mais si la victime visite le site de l'attaquant, le code **JavaScript** de l'attaquant s'exécute dans **son** navigateur, donc **à l'intérieur** du réseau protégé.\n\nLe navigateur applique quand même la **politique de même origine** (*Same-Origin Policy*, SOP) : le code de `www.attacker32.com` ne peut pas parler à `www.seedIoT32.com`. L'objectif du TP est de **contourner la SOP** par **DNS rebinding** : on garde le même *nom* (`www.attacker32.com`) mais on change l'**IP** derrière ce nom, pour faire parler le JavaScript au thermostat et régler sa température à une valeur dangereuse.\n\n**Trois machines, déjà configurées dans votre sandbox :**\n\n| VM | IP | Rôle |\n|-|-|-|\n| `user` | 10.0.2.6 | victime : thermostat IoT (port 8080) + navigateur Firefox |\n| `dns` | 10.0.2.7 | serveur DNS local (transfère `attacker32.com` vers l'attaquant) |\n| `attacker` | 10.0.2.8 | serveur web malveillant + DNS faisant autorité pour `attacker32.com` |\n\nTout tourne déjà (serveurs démarrés, DNS configuré). Vous vous concentrez sur l'attaque côté navigateur.\n\n**Notions :** DNS, Same-Origin Policy, TTL DNS, attaques sur l'IoT."
+  },
+  {
+   "title": "Accès à la sandbox",
+   "level_type": "ACCESS_LEVEL",
+   "order": 1,
+   "estimated_duration": 3,
+   "minimal_possible_solve_time": null,
+   "passkey": "start",
+   "cloud_content": "Soumettez la réponse **`start`** une fois connecté.\n\n### Machine principale : `user` (victime)\n1. Dans la topologie à droite, clic droit sur **`user`** → **`Open GUI`**.\n2. Connectez-vous avec **`seed`** / **`dees`**, ouvrez **Firefox**.\n\n### Les deux autres VM (`dns`, `attacker`)\nVous y éditez des fichiers et redémarrez des services : clic droit → **`Open GUI`** ou, plus pratique, **SSH** (copier-coller, plusieurs terminaux). Identifiants partout : **`seed`** / **`dees`** (avec `sudo`).\n\n> Tout est pré-démarré : serveur IoT, DNS local, serveur de l'attaquant, DNS de l'attaquant. Vous n'avez **pas** à réinstaller Flask ni BIND9.",
+   "local_content": "Ce scénario n'a pas été testé en sandbox locale. Utilisez la sandbox cloud."
+  },
+  {
+   "title": "Mise en place : tester le DNS",
+   "level_type": "TRAINING_LEVEL",
+   "order": 2,
+   "estimated_duration": 5,
+   "minimal_possible_solve_time": null,
+   "answer": "10.0.2.8",
+   "answer_variable_name": null,
+   "content": "Avant d'attaquer, vérifiez que la chaîne DNS fonctionne.\n\nSur la VM **`user`**, dans un terminal :\n```\ndig +short www.attacker32.com\n```\nLa requête part vers le DNS local (10.0.2.7), qui la **transfère** au DNS de l'attaquant (10.0.2.8). Vous devez obtenir l'IP que l'attaquant publie pour `www`.\n\n**Soumettez l'adresse IP renvoyée.**\n\nOuvrez aussi le thermostat pour voir l'état de départ : `http://www.seedIoT32.com:8080` (température ≈ 20 °C).",
+   "solution": "```\nseed@user:~$ dig +short www.attacker32.com\n10.0.2.8\n```\nL'IP 10.0.2.8 est celle de la VM attacker, publiée par son fichier de zone. La résolution passe par 10.0.2.7 (transfert).",
+   "solution_penalized": true,
+   "hints": [
+    {
+     "title": "La commande dig",
+     "content": "`dig www.attacker32.com` interroge le résolveur configuré dans `/etc/resolv.conf` (ici 10.0.2.7). L'option `+short` n'affiche que la réponse.",
+     "hint_penalty": 5,
+     "order": 0
+    }
+   ],
+   "incorrect_answer_limit": 20,
+   "attachments": [],
+   "max_score": 20,
+   "variant_answers": false,
+   "reference_solution": [],
+   "mitre_techniques": [],
+   "expected_commands": [],
+   "commands_required": false
+  },
+  {
+   "title": "Comprendre la politique de même origine",
+   "level_type": "TRAINING_LEVEL",
+   "order": 3,
+   "estimated_duration": 10,
+   "minimal_possible_solve_time": null,
+   "answer": "1",
+   "answer_variable_name": null,
+   "content": "Ouvrez **trois fenêtres** Firefox sur la VM `user` :\n\n- **A** `http://www.seedIoT32.com:8080` — le thermostat (laissez-la visible).\n- **B** `http://www.seedIoT32.com:8080/change` — bouton « régler à 99 °C », servi par **l'IoT**.\n- **C** `http://www.attacker32.com:8080/change` — page **identique**, servie par **l'attaquant**.\n\nCliquez le bouton sur **B** puis sur **C** et regardez le thermostat (fenêtre A). Ouvrez la console : *Tools → Web Developer → Web Console*.\n\n**Combien de ces deux pages (B et C) réussissent à régler la température ? Répondez par un chiffre.**",
+   "solution": "Une seule : **B** (page `www.seedIoT32.com`, **même origine** que le serveur IoT). **C** échoue : son code vient de `www.attacker32.com` et tente de parler à `www.seedIoT32.com` — la **Same-Origin Policy** le bloque (erreur CORS dans la console). Réponse : **1**.",
+   "solution_penalized": true,
+   "hints": [
+    {
+     "title": "Pourquoi C échoue ?",
+     "content": "La SOP compare le **schéma + nom d'hôte + port**. B parle à sa propre origine (seedIoT32). C a une origine différente (attacker32) de la cible (seedIoT32) → bloqué.",
+     "hint_penalty": 5,
+     "order": 0
+    },
+    {
+     "title": "Où voir l'erreur ?",
+     "content": "Dans la Web Console de la fenêtre C : un message de type *Cross-Origin Request Blocked*.",
+     "hint_penalty": 5,
+     "order": 1
+    }
+   ],
+   "incorrect_answer_limit": 20,
+   "attachments": [],
+   "max_score": 30,
+   "variant_answers": false,
+   "reference_solution": [],
+   "mitre_techniques": [],
+   "expected_commands": [],
+   "commands_required": false
+  },
+  {
+   "title": "Contourner la SOP par DNS rebinding",
+   "level_type": "TRAINING_LEVEL",
+   "order": 4,
+   "estimated_duration": 25,
+   "minimal_possible_solve_time": null,
+   "answer": null,
+   "answer_variable_name": "flag_dns",
+   "content": "La SOP compare les **noms**, pas les **IP**. Si la page de l'attaquant (`www.attacker32.com`) et le thermostat partagent le **même nom** `www.attacker32.com`, le navigateur croit rester dans la même origine. Idée : servir la page depuis l'attaquant (10.0.2.8), puis **rebinder** `www.attacker32.com` vers l'IoT (10.0.2.6) avant le clic.\n\n**Étape 1 — côté attaquant (VM `attacker`).** Le JavaScript de la page `/change` est dans\n`~/attacker_vm/rebind_malware/templates/js/change.js`. Faites-lui viser **son propre nom** :\n```\nlet url_prefix = 'http://www.attacker32.com:8080'\n```\nPuis redémarrez le serveur web : `sudo systemctl restart attacker-web`.\n\n**Étape 2 — le rebinding (VM `attacker`).** Éditez `/etc/bind/attacker32.com.zone` : abaissez le TTL et faites pointer `www` vers l'IoT.\n```\n$TTL 2\n...\nwww     IN      A     10.0.2.6\n```\nRechargez : `sudo rndc reload attacker32.com`.\n\n**Étape 3 — côté victime (VM `user`).** Chargez `http://www.attacker32.com:8080/change` (page servie par l'attaquant), attendez quelques secondes que le cache DNS expire, puis cliquez **Click**. La requête part maintenant vers l'**IoT** (10.0.2.6) en portant le nom `www.attacker32.com` : le thermostat monte à 99 °C.\n\n**Le flag.** Dès que le thermostat est réglé par cette voie, le serveur IoT débloque un flag. Récupérez-le :\n```\nhttp://www.attacker32.com:8080/flag\n```\n(ce nom pointe désormais vers l'IoT). **Soumettez la valeur du champ `flag`.**",
+   "solution": "1. `change.js` : `let url_prefix = 'http://www.attacker32.com:8080'` puis `sudo systemctl restart attacker-web`.\n2. Zone `/etc/bind/attacker32.com.zone` : `$TTL 2` et `www IN A 10.0.2.6`, puis `sudo rndc reload attacker32.com`.\n3. Sur `user` : ouvrir `http://www.attacker32.com:8080/change`, patienter > TTL, cliquer. Le thermostat (fenêtre `www.seedIoT32.com:8080`) passe à 99 °C.\n4. Ouvrir `http://www.attacker32.com:8080/flag` → `{\"flag\": \"...\"}`. C'est la réponse.\n\nLe flag n'apparaît que si la requête de réglage arrive à l'IoT avec le nom `www.attacker32.com` (signature du rebinding) : régler le curseur sur la page de l'IoT ne le débloque pas.",
+   "solution_penalized": true,
+   "hints": [
+    {
+     "title": "Toujours bloqué par la SOP ?",
+     "content": "Vérifiez l'étape 1 : la page de l'attaquant doit viser `www.attacker32.com` (son propre nom), sinon la SOP la bloque encore. Rechargez le serveur web après édition.",
+     "hint_penalty": 10,
+     "order": 0
+    },
+    {
+     "title": "Le clic ne change rien",
+     "content": "Le navigateur a peut-être encore l'ancienne IP en cache. Réduisez le TTL (`$TTL 2`), `sudo rndc reload attacker32.com`, puis attendez ~10 s avant de cliquer. Firefox est déjà réglé avec un cache DNS court.",
+     "hint_penalty": 15,
+     "order": 1
+    },
+    {
+     "title": "Vérifier le rebinding",
+     "content": "Sur `user` : `dig +short www.attacker32.com` doit renvoyer **10.0.2.6** après le reload. Si c'est encore 10.0.2.8, le reload n'a pas pris.",
+     "hint_penalty": 10,
+     "order": 2
+    }
+   ],
+   "incorrect_answer_limit": 20,
+   "attachments": [],
+   "max_score": 100,
+   "variant_answers": true,
+   "reference_solution": [],
+   "mitre_techniques": [],
+   "expected_commands": [],
+   "commands_required": false
+  },
+  {
+   "title": "Automatiser l'attaque",
+   "level_type": "TRAINING_LEVEL",
+   "order": 5,
+   "estimated_duration": 7,
+   "minimal_possible_solve_time": null,
+   "answer": "88",
+   "answer_variable_name": null,
+   "content": "Un vrai attaquant ne compte pas sur le clic de la victime. La page d'accueil de l'attaquant,\n`http://www.attacker32.com:8080`, contient un **minuteur** (10 → 0) : à 0, le JavaScript lance l'attaque tout seul, puis recommence.\n\nChargez cette page sur la VM `user` et laissez le DNS rebinding en place (zone pointant `www` vers 10.0.2.6, TTL court). À chaque passage à 0, le thermostat est réglé automatiquement.\n\n**À quelle température (°C) la version automatique règle-t-elle le thermostat ?** (voir `main.js`).",
+   "solution": "La page d'accueil de l'attaquant lance `launchAttack()` quand le minuteur atteint 0 ; `main.js` fixe `TEMPERATURE = 88`. Avec le rebinding en place, le thermostat passe à **88 °C** sans aucune action de la victime. Réponse : **88**.",
+   "solution_penalized": true,
+   "hints": [
+    {
+     "title": "Où est la valeur ?",
+     "content": "Dans `~/attacker_vm/rebind_malware/templates/js/main.js`, variable `TEMPERATURE`.",
+     "hint_penalty": 5,
+     "order": 0
+    }
+   ],
+   "incorrect_answer_limit": 20,
+   "attachments": [],
+   "max_score": 50,
+   "variant_answers": false,
+   "reference_solution": [],
+   "mitre_techniques": [],
+   "expected_commands": [],
+   "commands_required": false
+  },
+  {
+   "title": "Fin",
+   "level_type": "INFO_LEVEL",
+   "order": 6,
+   "estimated_duration": 3,
+   "minimal_possible_solve_time": null,
+   "content": "Bravo. Vous avez contourné la politique de même origine par **DNS rebinding** et piloté un objet connecté derrière un pare-feu.\n\n**À retenir :** la SOP raisonne sur les **noms**, pas sur les **IP** ; un attaquant qui contrôle le DNS d'un nom peut, après coup, pointer ce nom vers une cible interne. **Défenses :** validation de l'en-tête `Host` côté serveur (rejeter les noms inconnus), *DNS pinning*, et surtout une **authentification** réelle sur les objets connectés — pas un simple secret anti-CSRF.\n\nScore total : 200 points = 20/20 (note = points ÷ 10)."
+  }
+ ]
+}

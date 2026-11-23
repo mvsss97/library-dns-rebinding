@@ -1,0 +1,7 @@
+---
+# Rôle local-dns : BIND9 qui transfère le domaine de l'attaquant vers la VM attacker.
+
+bind_service: named            # Debian 12 : service « named » (alias « bind9 »)
+attacker_domain: attacker32.com
+attacker_ip: 10.0.2.8
+lab_net: 10.0.2.0/24

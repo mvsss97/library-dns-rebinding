@@ -1,0 +1,12 @@
+---
+# Rôle attacker-server : serveur web malveillant + DNS faisant autorité pour attacker32.com.
+
+attacker_user: seed
+attacker_dir: "/home/{{ attacker_user }}/attacker_vm"
+attacker_web_port: 8080        # codé en dur dans l'énoncé SEED : ne pas changer
+
+bind_service: named            # Debian 12 : service « named » (alias « bind9 »)
+attacker_domain: attacker32.com
+attacker_ip: 10.0.2.8          # IP de la VM attacker
+iot_ip: 10.0.2.6              # IP de la VM victime (cible du rebinding, fait par l'étudiant)
+zone_ttl: 10000                # TTL initial de l'énoncé SEED ; l'étudiant le réduit pour le rebinding

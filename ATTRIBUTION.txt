@@ -1,0 +1,25 @@
+Application code and pedagogical content
+----------------------------------------
+Based on "SEED Labs - DNS Rebinding Attack Lab"
+Copyright (c) 2019 Wenliang Du. Free to use for non-commercial educational purposes.
+https://seedsecuritylabs.org/
+The SEED project was funded by multiple grants from the US National Science Foundation.
+
+The Flask applications under:
+  provisioning/roles/iot-server/files/user_vm/        (IoT thermostat server)
+  provisioning/roles/attacker-server/files/attacker_vm/ (attacker web server)
+are the original SEED lab files (user_vm.zip / attacker_vm.zip), unchanged except
+for one addition to iot.py: a /flag endpoint used only to let CyberRangeCZ verify,
+per sandbox, that the DNS rebinding succeeded.
+
+Technical structure
+-------------------
+Repository layout, provisioning conventions and Ansible role usage are adapted from:
+library-junior-hacker (https://github.com/cyberrangecz/library-junior-hacker)
+Cybersecurity Laboratory, Faculty of Informatics, Masaryk University
+Code: MIT License. Game design: CC BY 4.0.
+
+Bundled third-party assets
+--------------------------
+jQuery 2.2.4 (MIT License) and Bootstrap CSS (MIT License) are included verbatim
+inside the SEED templates, as in the original lab.

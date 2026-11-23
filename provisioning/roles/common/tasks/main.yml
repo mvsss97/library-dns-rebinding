@@ -1,0 +1,17 @@
+---
+# Outils communs à toutes les VM du TP. apt n'est utilisé que pour ce qui manque,
+# pour ne pas dépendre d'un accès Internet rapide pendant le provisioning.
+
+- name: Update APT cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 600
+
+- name: Install common tools (python3, dig)
+  ansible.builtin.apt:
+    name:
+      - python3
+      - dnsutils
+    state: present
+    lock_timeout: 600

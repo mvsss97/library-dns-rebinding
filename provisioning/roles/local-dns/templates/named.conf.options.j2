@@ -1,0 +1,14 @@
+options {
+    directory "/var/cache/bind";
+
+    // La VM victime (10.0.2.6) utilise ce serveur comme résolveur.
+    recursion yes;
+    allow-query { any; };
+    allow-recursion { 127.0.0.1; {{ lab_net }}; };
+
+    // Pas d'accès Internet garanti dans la sandbox : on n'exige pas DNSSEC.
+    dnssec-validation no;
+
+    listen-on { any; };
+    listen-on-v6 { none; };
+};

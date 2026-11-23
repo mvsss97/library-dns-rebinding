@@ -1,0 +1,11 @@
+---
+- name: Restart iot server
+  ansible.builtin.systemd:
+    name: iot.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: restarted

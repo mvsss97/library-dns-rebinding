@@ -1,0 +1,15 @@
+# Variable APG : la plateforme génère une valeur DIFFÉRENTE par sandbox (donc par
+# étudiant). Ici un seul flag : la preuve que l'attaque DNS rebinding a réussi.
+#
+# Le flag n'est révélé par le serveur IoT (route /flag) que lorsqu'une requête de
+# réglage de température lui parvient AVEC le nom d'hôte de l'attaquant — c'est la
+# signature du rebinding. Régler le thermostat depuis sa propre page (même origine)
+# ne le débloque pas.
+#
+# type password = chaîne aléatoire [A-Za-z0-9]. 16 caractères : aucune collision
+# réaliste entre les étudiants d'un pool.
+# Doc : https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/apg-variables/
+
+flag_dns:
+  type: password
+  length: 16

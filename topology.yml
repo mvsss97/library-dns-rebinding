@@ -1,0 +1,65 @@
+# Topologie du SEED Lab « DNS Rebinding Attack » (CyberRangeCZ).
+#
+#   [ user ] 10.0.2.6 ─┐
+#   [ dns  ] 10.0.2.7 ─┼─ lab-net 10.0.2.0/24 ─ 10.0.2.1 [ router ] ─ WAN (Internet, provisioning)
+#   [ attacker ] 10.0.2.8 ─┘
+#
+# On garde EXACTEMENT le plan d'adressage de l'énoncé SEED (10.0.2.6/7/8), pour que
+# toutes les commandes du PDF (dig, zones, /etc/hosts…) fonctionnent sans adaptation.
+#
+# - user     : VM de la victime. Serveur IoT (thermostat) + navigateur Firefox. GUI.
+# - dns      : serveur DNS local (BIND9) ; transfère le domaine de l'attaquant vers « attacker ».
+# - attacker : serveur web malveillant (Flask) + serveur DNS faisant autorité pour attacker32.com.
+# - router   : obligatoire sur CyberRangeCZ (accès Internet pendant le provisioning : apt).
+
+name: library-dns-rebinding
+
+hosts:
+  - name: user
+    base_box:
+      image: seed              # image SEED (Ubuntu + Firefox) : la victime a besoin d'un navigateur
+      mgmt_user: ubuntu        # compte technique de la plateforme (Ansible), pas l'étudiant
+    flavor: m1.medium
+  - name: dns
+    base_box:
+      image: debian-12-x86_64  # serveur sans interface : BIND9 suffit
+      mgmt_user: debian
+    flavor: m1.medium
+  - name: attacker
+    base_box:
+      image: debian-12-x86_64  # serveur sans interface : BIND9 + Flask
+      mgmt_user: debian
+    flavor: m1.medium
+
+routers:
+  - name: router
+    base_box:
+      image: debian-12-x86_64
+      mgmt_user: debian
+    flavor: m1.medium
+
+wan:
+  name: internet-connection
+  cidr: 100.100.100.0/24
+
+networks:
+  - name: lab-net
+    cidr: 10.0.2.0/24
+
+net_mappings:
+  - host: user
+    network: lab-net
+    ip: 10.0.2.6
+  - host: dns
+    network: lab-net
+    ip: 10.0.2.7
+  - host: attacker
+    network: lab-net
+    ip: 10.0.2.8
+
+router_mappings:
+  - router: router
+    network: lab-net
+    ip: 10.0.2.1
+
+groups: []

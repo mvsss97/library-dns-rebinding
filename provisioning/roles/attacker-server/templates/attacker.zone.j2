@@ -1,0 +1,14 @@
+$TTL {{ zone_ttl }}
+@       IN      SOA   ns.{{ attacker_domain }}. admin.{{ attacker_domain }}. (
+                2008111001
+                8H
+                2H
+                4W
+                1D)
+
+@       IN      NS    ns.{{ attacker_domain }}.
+
+@       IN      A     {{ attacker_ip }}
+www     IN      A     {{ attacker_ip }}
+ns      IN      A     {{ attacker_ip }}
+*       IN      A     {{ attacker_ip }}

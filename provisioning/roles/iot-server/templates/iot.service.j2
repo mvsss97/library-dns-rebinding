@@ -1,0 +1,19 @@
+[Unit]
+Description=SEED IoT thermostat server (DNS rebinding lab)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ iot_user }}
+Group={{ iot_user }}
+WorkingDirectory={{ iot_dir }}
+EnvironmentFile=/etc/seed-iot.env
+Environment=FLASK_APP=rebind_iot
+Environment=FLASK_RUN_HOST=0.0.0.0
+Environment=FLASK_RUN_PORT={{ iot_port }}
+ExecStart=/usr/bin/python3 -m flask run
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

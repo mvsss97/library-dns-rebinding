@@ -1,0 +1,100 @@
+---
+# VM attaquant : serveur web (Flask) + BIND9 faisant autorité pour attacker32.com.
+
+- name: Install BIND9 and Flask
+  ansible.builtin.apt:
+    name:
+      - bind9
+      - python3-flask
+    state: present
+    lock_timeout: 600
+
+# ------------------------------------------------------------------ serveur web malveillant
+- name: Create the attacker app directory
+  ansible.builtin.file:
+    path: "{{ attacker_dir }}"
+    state: directory
+    owner: "{{ attacker_user }}"
+    group: "{{ attacker_user }}"
+    mode: "0755"
+
+# force: false -> ne jamais écraser le travail de l'étudiant (il édite change.js) lors
+# d'un re-provisioning.
+- name: Deploy the attacker web server (SEED attacker_vm)
+  ansible.builtin.copy:
+    src: attacker_vm/
+    dest: "{{ attacker_dir }}/"
+    owner: "{{ attacker_user }}"
+    group: "{{ attacker_user }}"
+    mode: "0644"
+    directory_mode: "0755"
+    force: false
+
+- name: Install the attacker web systemd unit
+  ansible.builtin.template:
+    src: attacker-web.service.j2
+    dest: /etc/systemd/system/attacker-web.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart attacker web
+
+- name: Enable and start the attacker web server
+  ansible.builtin.systemd:
+    name: attacker-web.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ------------------------------------------------------------------ DNS faisant autorité
+- name: Configure BIND9 options (authoritative)
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: root
+    group: bind
+    mode: "0644"
+    validate: named-checkconf %s
+  notify: Restart bind
+
+- name: Declare the attacker master zone in named.conf.local
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.local
+    marker: "// {mark} SEED DNS REBINDING (master)"
+    block: |
+      zone "{{ attacker_domain }}" {
+          type master;
+          file "/etc/bind/{{ attacker_domain }}.zone";
+      };
+    create: true
+    owner: root
+    group: bind
+    mode: "0644"
+  notify: Restart bind
+
+# Fichier de zone : déployé une seule fois, puis édité par l'étudiant (remap + TTL).
+- name: Check whether the zone file already exists
+  ansible.builtin.stat:
+    path: "/etc/bind/{{ attacker_domain }}.zone"
+  register: attacker_zone
+
+- name: Deploy the initial attacker zone file
+  when: not attacker_zone.stat.exists
+  ansible.builtin.template:
+    src: attacker.zone.j2
+    dest: "/etc/bind/{{ attacker_domain }}.zone"
+    owner: root
+    group: bind
+    mode: "0644"
+    validate: named-checkzone {{ attacker_domain }} %s
+  notify: Restart bind
+
+- name: Check the BIND9 configuration
+  ansible.builtin.command: named-checkconf
+  changed_when: false
+
+- name: Enable and start BIND9
+  ansible.builtin.systemd:
+    name: "{{ bind_service }}"
+    enabled: true
+    state: started

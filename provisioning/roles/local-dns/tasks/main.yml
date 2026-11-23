@@ -1,0 +1,45 @@
+---
+# Serveur DNS local : résout pour la VM victime et transfère attacker32.com vers l'attaquant.
+
+- name: Install BIND9
+  ansible.builtin.apt:
+    name: bind9
+    state: present
+    lock_timeout: 600
+
+- name: Configure BIND9 options (recursion for the lab network)
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    owner: root
+    group: bind
+    mode: "0644"
+    validate: named-checkconf %s
+  notify: Restart bind
+
+# Zone de TRANSFERT : toute requête pour attacker32.com est envoyée au serveur DNS
+# de l'attaquant (10.0.2.8), au lieu de passer par la racine et le serveur .com.
+- name: Add the attacker forward zone to named.conf.local
+  ansible.builtin.blockinfile:
+    path: /etc/bind/named.conf.local
+    marker: "// {mark} SEED DNS REBINDING (forward)"
+    block: |
+      zone "{{ attacker_domain }}" {
+          type forward;
+          forwarders { {{ attacker_ip }}; };
+      };
+    create: true
+    owner: root
+    group: bind
+    mode: "0644"
+  notify: Restart bind
+
+- name: Check the BIND9 configuration
+  ansible.builtin.command: named-checkconf
+  changed_when: false
+
+- name: Enable and start BIND9
+  ansible.builtin.systemd:
+    name: "{{ bind_service }}"
+    enabled: true
+    state: started

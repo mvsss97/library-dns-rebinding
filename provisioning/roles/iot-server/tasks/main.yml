@@ -1,0 +1,147 @@
+---
+# Serveur IoT (thermostat) + résolution DNS sur la VM victime.
+
+- name: Install Flask
+  ansible.builtin.apt:
+    name: python3-flask
+    state: present
+    lock_timeout: 600
+
+# ------------------------------------------------------------------ fichiers du serveur IoT
+- name: Create the IoT app directory
+  ansible.builtin.file:
+    path: "{{ iot_dir }}"
+    state: directory
+    owner: "{{ iot_user }}"
+    group: "{{ iot_user }}"
+    mode: "0755"
+
+- name: Deploy the IoT server (SEED user_vm)
+  ansible.builtin.copy:
+    src: user_vm/
+    dest: "{{ iot_dir }}/"
+    owner: "{{ iot_user }}"
+    group: "{{ iot_user }}"
+    mode: "0644"
+    directory_mode: "0755"
+
+# ------------------------------------------------------------------ flag de la sandbox
+- name: Write the IoT service environment (flag of this sandbox)
+  ansible.builtin.template:
+    src: seed-iot.env.j2
+    dest: /etc/seed-iot.env
+    owner: root
+    group: "{{ iot_user }}"
+    mode: "0640"
+  no_log: true
+  notify: Restart iot server
+
+# ------------------------------------------------------------------ service systemd
+- name: Install the IoT systemd unit
+  ansible.builtin.template:
+    src: iot.service.j2
+    dest: /etc/systemd/system/iot.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart iot server
+
+- name: Enable and start the IoT server
+  ansible.builtin.systemd:
+    name: iot.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ------------------------------------------------------------------ nom du serveur IoT (/etc/hosts)
+- name: Map the IoT hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s{{ iot_hostname }}\s*$'
+    line: "{{ iot_self_ip }} {{ iot_hostname }}"
+    state: present
+
+# ------------------------------------------------------------------ résolveur = DNS local (10.0.2.7)
+# Méthode « resolvconf » de l'énoncé SEED (image SEED classique)…
+- name: Check for resolvconf
+  ansible.builtin.stat:
+    path: /etc/resolvconf/resolv.conf.d
+  register: iot_resolvconf
+
+- name: Prepend the local DNS server via resolvconf head
+  when: iot_resolvconf.stat.exists
+  block:
+    - name: Write resolvconf head
+      ansible.builtin.copy:
+        dest: /etc/resolvconf/resolv.conf.d/head
+        content: |
+          # Généré par le TP DNS rebinding : forcer le DNS local en premier.
+          nameserver {{ local_dns_ip }}
+        owner: root
+        group: root
+        mode: "0644"
+    - name: Apply resolvconf
+      ansible.builtin.command: resolvconf -u
+      changed_when: true
+
+# …sinon méthode systemd-resolved (images Debian/Ubuntu récentes).
+- name: Check for systemd-resolved
+  ansible.builtin.stat:
+    path: /etc/systemd/resolved.conf
+  register: iot_resolved
+
+- name: Point systemd-resolved at the local DNS server
+  when: iot_resolved.stat.exists and not iot_resolvconf.stat.exists
+  block:
+    - name: Set DNS in resolved.conf
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^#?DNS='
+        line: "DNS={{ local_dns_ip }}"
+      notify: Restart systemd-resolved
+    - name: Flush handlers to apply DNS now
+      ansible.builtin.meta: flush_handlers
+
+# Filet de sécurité : si /etc/resolv.conf est un vrai fichier, s'assurer que le DNS
+# local y est en premier (sans casser un éventuel lien symbolique géré par le système).
+- name: Inspect /etc/resolv.conf
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+  register: iot_resolv
+
+- name: Ensure the local DNS server is first in resolv.conf
+  when: iot_resolv.stat.exists and not iot_resolv.stat.islnk
+  ansible.builtin.lineinfile:
+    path: /etc/resolv.conf
+    regexp: '^nameserver\s+{{ local_dns_ip }}\s*$'
+    line: "nameserver {{ local_dns_ip }}"
+    insertbefore: BOF
+
+# ------------------------------------------------------------------ Firefox : cache DNS court (best-effort)
+- name: Look for a classic Firefox install
+  ansible.builtin.stat:
+    path: /usr/lib/firefox
+  register: iot_firefox
+
+- name: Reduce Firefox DNS cache time
+  when: iot_firefox.stat.exists and iot_firefox.stat.isdir
+  block:
+    - name: Enable Firefox autoconfig
+      ansible.builtin.copy:
+        dest: /usr/lib/firefox/defaults/pref/autoconfig.js
+        content: |
+          pref("general.config.filename", "seed.cfg");
+          pref("general.config.obscure_value", 0);
+        owner: root
+        group: root
+        mode: "0644"
+    - name: Lock the DNS cache expiration
+      ansible.builtin.copy:
+        dest: /usr/lib/firefox/seed.cfg
+        content: |
+          // Réduit le cache DNS de Firefox (énoncé SEED, tâche 1 étape 1).
+          lockPref("network.dnsCacheExpiration", {{ firefox_dns_cache_seconds }});
+        owner: root
+        group: root
+        mode: "0644"
+  ignore_errors: true

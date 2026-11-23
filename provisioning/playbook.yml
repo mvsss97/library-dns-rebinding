@@ -1,0 +1,71 @@
+---
+# Provisioning du SEED Lab « DNS Rebinding Attack » pour CyberRangeCZ.
+#
+# Trois VM sont configurées pour que l'étudiant n'ait plus que la partie « navigateur »
+# à faire (observer la SOP, modifier change.js, faire le rebinding, lancer l'attaque) :
+#   - user     : serveur IoT (thermostat) + résolveur pointant sur le DNS local ;
+#   - dns      : BIND9, transfère le domaine de l'attaquant vers la VM attacker ;
+#   - attacker : serveur web malveillant + BIND9 faisant autorité pour attacker32.com.
+#
+# La variable flag_dns est générée par la plateforme à partir de ../variables.yml
+# (une valeur par sandbox). La valeur par défaut ne sert qu'aux tests hors plateforme.
+
+# Outils communs (python3, dnsutils pour dig) sur les trois VM du TP.
+- name: Common tools
+  hosts: hosts
+  become: true
+  roles:
+    - common
+
+# VM victime : compte étudiant seed / dees (avec sudo : le TP demande d'éditer des
+# fichiers système et de redémarrer des services) + serveur IoT.
+- name: Configure the user VM
+  hosts: user
+  become: true
+  roles:
+    - role: user-access
+      user_access_username: seed
+      user_access_password: dees
+      user_access_sudo: true
+    - role: iot-server
+      iot_dns_flag: "{{ flag_dns | default('LocalDnsRebindFlag') }}"
+
+# Serveur DNS local.
+- name: Configure the local DNS server
+  hosts: dns
+  become: true
+  roles:
+    - role: user-access
+      user_access_username: seed
+      user_access_password: dees
+      user_access_sudo: true
+    - role: local-dns
+
+# VM attaquant : serveur web + DNS faisant autorité.
+- name: Configure the attacker VM
+  hosts: attacker
+  become: true
+  roles:
+    - role: user-access
+      user_access_username: seed
+      user_access_password: dees
+      user_access_sudo: true
+    - role: attacker-server
+
+# Journalisation des commandes (identique au modèle Junior Hacker) : l'enseignant
+# retrouve dans la plateforme les commandes tapées par chaque étudiant.
+- name: setup hosts logging roles
+  hosts:
+    - routers
+    - hosts
+  become: true
+  vars:
+    sandbox_name: seed-dns-rebinding-local
+    central_syslog_ip: 78.128.251.179
+  roles:
+    - role: sandbox-logging
+      slf_destination_port: '{% if hostvars["man"] is defined -%} 514 {%- else -%} 515 {%- endif %}'
+      slf_destination: '{% if hostvars["man"] is defined -%} {{ hostvars["man"].ansible_host }} {%- else -%} {{ central_syslog_ip }} {%- endif %}'
+      slf_sandbox_id: "{{ global_sandbox_id | default(student_id) | default(0) }}"
+      slf_sandbox_name: '{{ global_sandbox_name | default(sandbox_name) }}'
+      slf_pool_id: '{{ global_pool_id | default(None) }}'
