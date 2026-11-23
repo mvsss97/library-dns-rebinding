@@ -10,7 +10,7 @@ WorkingDirectory={{ attacker_dir }}
 Environment=FLASK_APP=rebind_malware
 Environment=FLASK_RUN_HOST=0.0.0.0
 Environment=FLASK_RUN_PORT={{ attacker_web_port }}
-ExecStart=/usr/bin/python3 -m flask run
+ExecStart={{ seed_venv_python }} -m flask run
 Restart=on-failure
 RestartSec=2
 

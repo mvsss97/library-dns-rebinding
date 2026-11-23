@@ -10,3 +10,7 @@ attacker_domain: attacker32.com
 attacker_ip: 10.0.2.8          # IP de la VM attacker
 iot_ip: 10.0.2.6              # IP de la VM victime (cible du rebinding, fait par l'étudiant)
 zone_ttl: 10000                # TTL initial de l'énoncé SEED ; l'étudiant le réduit pour le rebinding
+
+# Python du virtualenv créé par le rôle « common ».
+seed_venv: /opt/seed-venv
+seed_venv_python: "{{ seed_venv }}/bin/python"

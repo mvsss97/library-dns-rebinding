@@ -58,6 +58,18 @@
     state: started
     daemon_reload: true
 
+# Même exigence que pour le thermostat : le service doit réellement répondre.
+- name: Assert the attacker web server really answers
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ attacker_web_port }}/"
+    status_code: 200
+  register: atk_probe
+  retries: 15
+  delay: 2
+  until:
+    - atk_probe.status is defined
+    - atk_probe.status == 200
+
 # ------------------------------------------------------------------ DNS faisant autorité
 - name: Configure BIND9 options (authoritative)
   ansible.builtin.template:

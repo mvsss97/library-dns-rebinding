@@ -49,6 +49,20 @@
     state: started
     daemon_reload: true
 
+# Démarrer le service ne suffit pas : s'il meurt juste après, la sandbox serait
+# allouée « au vert » avec un thermostat mort. On exige une vraie réponse HTTP.
+- name: Assert the thermostat really answers
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ iot_port }}/temperature"
+    return_content: true
+  register: iot_probe
+  retries: 15
+  delay: 2
+  until:
+    - iot_probe.status is defined
+    - iot_probe.status == 200
+    - "'temperature' in (iot_probe.content | default(''))"
+
 # ------------------------------------------------------------------ nom du serveur IoT (/etc/hosts)
 - name: Map the IoT hostname in /etc/hosts
   ansible.builtin.lineinfile:
