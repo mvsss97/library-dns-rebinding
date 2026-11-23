@@ -1,0 +1,4 @@
+---
+# Virtualenv dédié aux serveurs Flask du TP (isolé du Python système).
+seed_venv: /opt/seed-venv
+seed_venv_python: "{{ seed_venv }}/bin/python"

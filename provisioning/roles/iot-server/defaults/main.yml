@@ -18,3 +18,7 @@ iot_dns_flag: LocalDnsRebindFlag   # remplacé par flag_dns (APG) sur la platefo
 # Réduire le cache DNS de Firefox (énoncé SEED, tâche 1 étape 1) pour que le rebinding
 # ne demande pas d'attendre 60 s. Best-effort : si Firefox n'est pas présent, on ignore.
 firefox_dns_cache_seconds: 10
+
+# Python du virtualenv créé par le rôle « common ».
+seed_venv: /opt/seed-venv
+seed_venv_python: "{{ seed_venv }}/bin/python"
