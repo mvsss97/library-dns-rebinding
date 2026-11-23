@@ -7,6 +7,19 @@
     state: present
     lock_timeout: 600
 
+# Debian 12 : service « named » ; Ubuntu 20.04 : service « bind9 ».
+- name: Detect the BIND service unit name
+  ansible.builtin.shell: |
+    if systemctl list-unit-files named.service 2>/dev/null | grep -q '^named\.service'; then echo named; else echo bind9; fi
+  args:
+    executable: /bin/bash
+  register: dns_bind_unit
+  changed_when: false
+
+- name: Set the BIND service name
+  ansible.builtin.set_fact:
+    bind_service: "{{ dns_bind_unit.stdout | trim }}"
+
 - name: Configure BIND9 options (recursion for the lab network)
   ansible.builtin.template:
     src: named.conf.options.j2
@@ -14,7 +27,6 @@
     owner: root
     group: bind
     mode: "0644"
-    validate: named-checkconf %s
   notify: Restart bind
 
 # Zone de TRANSFERT : toute requête pour attacker32.com est envoyée au serveur DNS

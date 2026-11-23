@@ -90,8 +90,17 @@
     path: /etc/systemd/resolved.conf
   register: iot_resolved
 
+- name: Is systemd-resolved active?
+  ansible.builtin.command: systemctl is-active systemd-resolved
+  register: iot_resolved_active
+  changed_when: false
+  failed_when: false
+
 - name: Point systemd-resolved at the local DNS server
-  when: iot_resolved.stat.exists and not iot_resolvconf.stat.exists
+  when:
+    - iot_resolved.stat.exists
+    - not iot_resolvconf.stat.exists
+    - iot_resolved_active.stdout == "active"
   block:
     - name: Set DNS in resolved.conf
       ansible.builtin.lineinfile:
